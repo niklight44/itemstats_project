@@ -1,0 +1,65 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-itemstats}
+      POSTGRES_USER: ${POSTGRES_USER:-itemuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-itempass}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  web:
+    build: .
+    command: ["/bin/sh", "-c", "gunicorn itemstats.wsgi:application --bind 0.0.0.0:8000"]
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: itemstats.settings
+    volumes:
+      - ./:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  worker:
+    build: .
+    command: ["celery", "-A", "itemstats", "worker", "-l", "INFO"]
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: itemstats.settings
+    volumes:
+      - ./:/app
+    depends_on:
+      - web
+      - redis
+
+  beat:
+    build: .
+    command: ["celery", "-A", "itemstats", "beat", "-l", "INFO"]
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: itemstats.settings
+    volumes:
+      - ./:/app
+    depends_on:
+      - worker
+      - redis
+
+volumes:
+  pgdata:
