@@ -23,7 +23,7 @@ services:
 
   web:
     build: .
-    command: ["/bin/sh", "-c", "gunicorn itemstats.wsgi:application --bind 0.0.0.0:8000"]
+    command: [ "gunicorn", "itemstats.wsgi:application", "--bind", "0.0.0.0:8000" ]
     env_file: .env
     environment:
       DJANGO_SETTINGS_MODULE: itemstats.settings
@@ -47,8 +47,10 @@ services:
     volumes:
       - ./:/app
     depends_on:
-      - web
-      - redis
+      web:
+        condition: service_started
+      redis:
+        condition: service_started
 
   beat:
     build: .
@@ -59,8 +61,10 @@ services:
     volumes:
       - ./:/app
     depends_on:
-      - worker
-      - redis
+      worker:
+        condition: service_started
+      redis:
+        condition: service_started
 
 volumes:
   pgdata:
