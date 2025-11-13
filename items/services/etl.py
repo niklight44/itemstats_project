@@ -4,6 +4,7 @@ import io
 import requests
 from urllib.parse import urlparse
 from django.utils.dateparse import parse_datetime
+from django.db import transaction
 from django.utils import timezone
 from items.models import Item
 
@@ -85,19 +86,42 @@ class ItemETLService:
         except Exception:
             return None
 
-    def _import_to_db(self, df: pd.DataFrame) -> dict:
-        created, updated = 0, 0
+    def _import_to_db(self, df):
+        # Получаем все существующие товары из базы
+        existing = {
+            (i.name, i.category): i
+            for i in Item.objects.all().only("id", "name", "category", "price", "updated_at")
+        }
+
+        new_items = []
+        updated_items = []
+
         for row in df.to_dict(orient="records"):
-            obj, is_created = Item.objects.get_or_create(
-                name=row["name"],
-                category=row["category"],
-                defaults={"price": row["price"], "updated_at": row["updated_at"]},
-            )
-            if is_created:
-                created += 1
-            elif row["updated_at"] > obj.updated_at:
-                obj.price = row["price"]
-                obj.updated_at = row["updated_at"]
-                obj.save(update_fields=["price", "updated_at"])
-                updated += 1
-        return {"created": created, "updated": updated, "total": len(df)}
+            key = (row["name"], row["category"])
+            item = existing.get(key)
+
+            if item is None:
+                new_items.append(
+                    Item(
+                        name=row["name"],
+                        category=row["category"],
+                        price=row["price"],
+                        updated_at=row["updated_at"],
+                    )
+                )
+            elif row["updated_at"] > item.updated_at:
+                item.price = row["price"]
+                item.updated_at = row["updated_at"]
+                updated_items.append(item)
+
+        with transaction.atomic():
+            if new_items:
+                Item.objects.bulk_create(new_items, batch_size=500)
+            if updated_items:
+                Item.objects.bulk_update(updated_items, ["price", "updated_at"], batch_size=500)
+
+        return {
+            "created": len(new_items),
+            "updated": len(updated_items),
+            "total": len(df),
+        }
