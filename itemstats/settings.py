@@ -103,3 +103,10 @@ CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/1')
 
 # Stats cache TTL
 STATS_CACHE_TTL = int(os.getenv('STATS_CACHE_TTL', '300'))
+
+SWAGGER_SETTINGS = {
+   'USE_SESSION_AUTH': False
+}
+
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'

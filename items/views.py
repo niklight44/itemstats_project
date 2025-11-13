@@ -8,6 +8,9 @@ from rest_framework.views import APIView
 from .models import Item
 from .serializers import ItemSerializer
 import pandas as pd
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+
 
 class ItemFilter(filters.FilterSet):
     category = filters.CharFilter(field_name='category', lookup_expr='iexact')
@@ -18,12 +21,28 @@ class ItemFilter(filters.FilterSet):
         model = Item
         fields = ['category', 'price_min', 'price_max']
 
+
 class ItemListView(generics.ListAPIView):
     queryset = Item.objects.all().order_by('id')
     serializer_class = ItemSerializer
     filterset_class = ItemFilter
 
+    @swagger_auto_schema(
+        operation_description="Получить список товаров с фильтрацией по категории и цене",
+        responses={200: ItemSerializer(many=True)},
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+
 class AvgPriceByCategoryView(APIView):
+    @swagger_auto_schema(
+        operation_description="Средняя цена товаров по категориям",
+        responses={200: openapi.Response(
+            description="Словарь с категориями и средними ценами",
+            examples={"application/json": {"electronics": 150.5, "books": 82.3}}
+        )}
+    )
     def get(self, request):
         key = "stats:avg_price_by_category"
         data = cache.get(key)
