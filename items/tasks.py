@@ -1,7 +1,9 @@
 from celery import shared_task
-from django.core.management import call_command
+from items.services.etl import ItemETLService
 
-@shared_task(name='items.tasks.import_items_task')
+
+@shared_task(name="items.tasks.import_items_task")
 def import_items_task(source: str | None = None):
-    # source can be a URL or a local file path; the management command handles it
-    call_command('import_items', '--source', source or '')
+    service = ItemETLService(source or "items/sample_data/sample.csv")
+    result = service.run()
+    return result
