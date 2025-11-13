@@ -10,5 +10,6 @@ COPY requirements.txt /app/
 RUN pip install -r requirements.txt
 
 COPY . /app/
+RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000
